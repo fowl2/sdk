@@ -60,7 +60,8 @@ namespace Microsoft.NetCore.Analyzers.Runtime
 
             context.RegisterCompilationStartAction(context =>
             {
-                if (!context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.SystemLinqEnumerable, out var enumerableType))
+                if (!context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.SystemLinqEnumerable, out var enumerableType)
+                && !context.Compilation.TryGetOrCreateTypeByMetadataName(WellKnownTypeNames.SystemCollectionsImmutableImmutableArray1, out var imuttableArrayType))
                 {
                     return;
                 }
@@ -73,8 +74,9 @@ namespace Microsoft.NetCore.Analyzers.Runtime
                         .Where(method => method.IsExtensionMethod
                                       && method.TypeParameters.HasExactly(1)
                                       && method.Parameters.HasExactly(1)
-                                      && method.Parameters[0].Type.OriginalDefinition.SpecialType
-                                            == SpecialType.System_Collections_IEnumerable
+                                      && method.Parameters[0].Type.OriginalDefinition is {} t
+                                      && (t.SpecialType == SpecialType.System_Collections_IEnumerable
+                                         || t.Equals(imutableArrayTypeSymbol))
                               )
                         .Select(method => (method, m.Rule)))
                     .ToImmutableDictionary(key => (ISymbol)key.method, v => v.Rule, SymbolEqualityComparer.Default);
@@ -182,7 +184,7 @@ namespace Microsoft.NetCore.Analyzers.Runtime
             });
 
             // because this is a warning, we want to be very sure
-            // this won't catch all problems, but it should never report something 
+            // this won't catch all problems, but it should never report something
             // as a problem in correctly. We don't want another IDE0004
             static bool CastWillAlwaysFail(ITypeSymbol castFrom, ITypeSymbol castTo)
             {
